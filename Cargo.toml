@@ -1,0 +1,23 @@
+[package]
+name = "mu_t"
+version = "1.0.0"
+edition = "2021"
+description = "A terminal-based LaTeX editor (μT)"
+
+[lib]
+name = "mu_t"
+
+[[bin]]
+name = "muT"
+path = "src/main.rs"
+
+[dependencies]
+ratatui = "0.30"
+crossterm = "0.29"
+ropey = "2.0.0-beta.1"
+color-eyre = "0.6"
+syntect = { version = "5.3", default-features = false, features = ["default-fancy"] }
+syntect-tui = "3.0"
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
+

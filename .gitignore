@@ -1,0 +1,9 @@
+target/
+*.swp
+*.swo
+*.swn
+*.bak
+~*
+.DS_Store
+*.pyc
+__pycache__/

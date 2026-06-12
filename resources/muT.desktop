@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=μT
+Name[en]=muT
+Comment=A terminal-based LaTeX editor
+Comment[en]=A terminal-based LaTeX editor with Micro-like editing, pdflatex build, and Zathura preview
+Exec=muT %f
+Icon=muT
+Terminal=true
+Categories=Development;TeX;Office;
+MimeType=text/x-tex;
+StartupNotify=false

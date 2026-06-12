@@ -1,0 +1,120 @@
+.\" Man page for muT
+.\" Auto-generated. Send corrections to the maintainer.
+
+.TH muT 1 "2025-06-10" "1.0.0" "User Commands"
+
+.SH NAME
+muT \- a terminal-based LaTeX editor
+
+.SH SYNOPSIS
+.B muT
+[\fIfile\fR]
+
+.SH DESCRIPTION
+.B muT
+is a terminal-based LaTeX editor with Micro-like editing, asynchronous
+pdflatex compilation, Zathura preview, syntax highlighting, undo/redo,
+selection, bracket auto-closing, and more.
+
+.SH OPTIONS
+.TP
+.BI file
+Optional LaTeX file to open on startup.  If omitted, a new file with
+the default LaTeX template is created.
+
+.SH KEYBINDINGS
+.TP
+.B Ctrl+S
+Save (prompts Save As with .tex forced if new file)
+.TP
+.B Ctrl+O
+Open .tex file
+.TP
+.B Ctrl+N
+New file (inserts LaTeX template)
+.TP
+.B Ctrl+Q
+Quit
+.TP
+.B Ctrl+Z / Ctrl+Y
+Undo / Redo
+.TP
+.B Ctrl+C / Ctrl+X / Ctrl+V
+Copy / Cut / Paste
+.TP
+.B Ctrl+A
+Select all
+.TP
+.B Ctrl+F
+Find
+.TP
+.B Ctrl+G
+Go to line
+.TP
+.B Ctrl+B
+Build (async pdflatex)
+.TP
+.B Ctrl+P
+Toggle Zathura preview (builds if closed)
+.TP
+.B Ctrl+E
+View build errors (Up/Down to cycle, Esc to close)
+.TP
+.B Ctrl+Up / Ctrl+Down
+Scroll view without moving cursor
+.TP
+.B Shift+Arrow/Home/End/PgUp/PgDn
+Extend selection
+.TP
+.B Tab
+Accept ghost \e\fIend\fR{} or insert 4 spaces
+
+.SH AUTO-CLOSE
+.TP
+.B {
+Close to {} with cursor between
+.TP
+.B (
+Close to () with cursor between
+.TP
+.B $
+Close to $$ with cursor between
+.TP
+.B \e\fIbegin\fR{...} then }
+Show ghost \e\fIend\fR{...} (Tab to accept)
+
+.SH CONFIGURATION
+Configuration file: \fI~/.config/muT/config.toml\fR
+.br
+Defaults:
+.IP
+[theme]
+name = "dark"
+syntax = "base16-ocean.dark"
+.IP
+[editor]
+tab_width = 4
+auto_save_interval = 10
+
+.SH FILES
+.TP
+.I ~/.config/muT/config.toml
+User configuration file
+.TP
+.I ~/.cache/Tectonic/
+Tectonic bundle cache (automatically downloaded)
+
+.SH DEPENDENCIES
+.B pdflatex
+(from texlive-core) is required for compilation.
+.br
+.B zathura
+and
+.B zathura-pdf-poppler
+are required for the preview window.
+
+.SH AUTHORS
+Written by the muT contributors.
+
+.SH BUGS
+Report bugs at https://github.com/faris0x/muT/issues
