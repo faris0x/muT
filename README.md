@@ -15,7 +15,7 @@ A terminal-based LaTeX editor with Micro-like editing, asynchronous `pdflatex` c
 ### AUR (Arch Linux)
 
 ```bash
-yay -S muT
+yay -S mut
 ```
 
 All dependencies are installed automatically.
