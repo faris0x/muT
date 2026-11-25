@@ -15,7 +15,7 @@ depends=(
 )
 makedepends=('cargo')
 source=("$pkgname-$pkgver.tar.gz::https://github.com/faris0x/muT/archive/v$pkgver.tar.gz")
-sha256sums=('SKIP')
+sha256sums=('2f294cd39f9dc00eb06c9532f8cc41f9f488a051128ee5f1d1e1e91b88a7de11')
 validpgpkeys=()
 
 prepare() {
