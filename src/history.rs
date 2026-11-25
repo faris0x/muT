@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Faris Alfarhan
+// SPDX-License-Identifier: MIT
+
 use crate::cursor::Cursor;
 
 /// A single reversible edit operation.

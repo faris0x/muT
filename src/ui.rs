@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Faris Alfarhan
+// SPDX-License-Identifier: MIT
+
 use ratatui::{
     layout::{Constraint, Layout, Rect},
     style::{Color, Modifier, Style, Stylize},
@@ -13,6 +16,7 @@ use crate::app::App;
 pub fn render(app: &App, frame: &mut Frame) {
     let area = frame.area();
     let cmd_active = matches!(app.mode, crate::app::Mode::Command { .. })
+        || matches!(app.mode, crate::app::Mode::Replace(_))
         || matches!(app.mode, crate::app::Mode::Confirm { .. })
         || matches!(app.mode, crate::app::Mode::ErrorView { .. })
         || matches!(app.mode, crate::app::Mode::Help);
@@ -405,6 +409,30 @@ fn render_command_bar(app: &App, frame: &mut Frame, area: Rect) {
         )))
         .bg(app.config.theme.command_bg);
         frame.render_widget(widget, area);
+        return;
+    }
+
+    if let crate::app::Mode::Replace(ref state) = app.mode {
+        use crate::app::ReplaceStage;
+        let (prompt, text) = match state.stage {
+            ReplaceStage::Query => ("Replace: ", state.query.as_str()),
+            ReplaceStage::Replacement => ("Replace with: ", state.replacement.as_str()),
+            ReplaceStage::Action => ("Enter = next · a = all · Esc = done  ", ""),
+        };
+        let display = if state.stage == ReplaceStage::Action {
+            format!("{prompt}({} matches)", state.matches)
+        } else {
+            format!("{prompt}{text}")
+        };
+        let widget = Paragraph::new(Line::from(Span::styled(
+            display.clone(),
+            Style::default().fg(app.config.theme.command_fg).bg(app.config.theme.command_bg),
+        )))
+        .bg(app.config.theme.command_bg);
+        frame.render_widget(widget, area);
+        if state.stage != ReplaceStage::Action {
+            frame.set_cursor_position((area.x + display.len() as u16, area.y));
+        }
         return;
     }
 

@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Faris Alfarhan
+// SPDX-License-Identifier: MIT
+
 use ropey::{Rope, LineType};
 use std::fs;
 use std::io::{BufReader, BufWriter};

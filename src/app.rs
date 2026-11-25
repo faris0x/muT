@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Faris Alfarhan
+// SPDX-License-Identifier: MIT
+
 use std::path::PathBuf;
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
@@ -9,6 +12,7 @@ use crate::config::Config;
 use crate::cursor::Cursor;
 use crate::history::{Edit, History};
 use crate::latex;
+use crate::search;
 use crate::syntax::Highlighter;
 use crate::ui;
 
@@ -18,9 +22,10 @@ Ctrl+N    New file                      Ctrl+Q    Quit
 Ctrl+Z    Undo                          Ctrl+Y    Redo
 Ctrl+C    Copy                          Ctrl+X    Cut
 Ctrl+V    Paste                         Ctrl+A    Select all
-Ctrl+F    Find                          Ctrl+G    Go to line
-Ctrl+B    Build (pdflatex)              Ctrl+P    Toggle Zathura preview
-Ctrl+E    View build errors             Ctrl+H    This help
+Ctrl+F    Find                          Ctrl+R    Replace
+Ctrl+G    Go to line                    Ctrl+B    Build (pdflatex)
+Ctrl+P    Toggle Zathura preview        Ctrl+E    View build errors
+Ctrl+H    This help
 Shift+↑↓←→  Extend selection            Tab       Accept ghost / 4 spaces
 ↑↓←→     Move cursor                   Ctrl+↑↓   Scroll view
 { → {}   ( → ()   $ → $$              \\begin{X}} → \\end{X} ghost";
@@ -86,6 +91,21 @@ pub enum ConfirmAction {
     SaveAsOverwrite,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReplaceStage {
+    Query,
+    Replacement,
+    Action,
+}
+
+#[derive(Debug, Clone)]
+pub struct ReplaceState {
+    pub query: String,
+    pub replacement: String,
+    pub stage: ReplaceStage,
+    pub matches: usize,
+}
+
 #[derive(Debug, Clone)]
 pub enum Mode {
     Normal,
@@ -93,6 +113,7 @@ pub enum Mode {
         input: String,
         kind: CommandKind,
     },
+    Replace(ReplaceState),
     Confirm {
         message: String,
         action: ConfirmAction,
@@ -335,6 +356,7 @@ impl App {
         match self.mode.clone() {
             Mode::Normal => self.handle_normal_key(key),
             Mode::Command { .. } => self.handle_command_key(key),
+            Mode::Replace(_) => self.handle_replace_key(key),
             Mode::Confirm { .. } => self.handle_confirm_key(key),
             Mode::ErrorView { .. } => self.handle_error_view_key(key),
             Mode::Help => self.handle_help_key(key),
@@ -364,6 +386,15 @@ impl App {
                     input: String::new(),
                     kind: CommandKind::Find,
                 };
+            }
+            // Replace
+            (KeyCode::Char('r'), KeyModifiers::CONTROL) => {
+                self.mode = Mode::Replace(ReplaceState {
+                    query: String::new(),
+                    replacement: String::new(),
+                    stage: ReplaceStage::Query,
+                    matches: 0,
+                });
             }
             // Go to line
             (KeyCode::Char('g'), KeyModifiers::CONTROL) => {
@@ -574,6 +605,85 @@ impl App {
         }
     }
 
+    fn handle_replace_key(&mut self, key: KeyEvent) {
+        let mut state = match self.mode.clone() {
+            Mode::Replace(state) => state,
+            _ => return,
+        };
+
+        match state.stage {
+            ReplaceStage::Query | ReplaceStage::Replacement => {
+                match (key.code, key.modifiers) {
+                    (KeyCode::Esc, _) => {
+                        self.mode = Mode::Normal;
+                        self.cancel_message();
+                    }
+                    (KeyCode::Enter, _) => {
+                        if state.stage == ReplaceStage::Query {
+                            if state.query.is_empty() {
+                                self.mode = Mode::Normal;
+                                self.set_message("No search term");
+                                return;
+                            }
+                            state.stage = ReplaceStage::Replacement;
+                        } else {
+                            state.stage = ReplaceStage::Action;
+                            state.matches =
+                                search::count_matches(&self.buffer.to_string(), &state.query);
+                            if state.matches == 0 {
+                                self.set_message("Not found");
+                            }
+                        }
+                        self.mode = Mode::Replace(state);
+                    }
+                    (KeyCode::Backspace, _) => {
+                        if state.stage == ReplaceStage::Query {
+                            state.query.pop();
+                        } else {
+                            state.replacement.pop();
+                        }
+                        self.mode = Mode::Replace(state);
+                    }
+                    (KeyCode::Char(c), KeyModifiers::NONE)
+                    | (KeyCode::Char(c), KeyModifiers::SHIFT) => {
+                        if state.stage == ReplaceStage::Query {
+                            state.query.push(c);
+                        } else {
+                            state.replacement.push(c);
+                        }
+                        self.mode = Mode::Replace(state);
+                    }
+                    _ => {}
+                }
+            }
+            ReplaceStage::Action => match (key.code, key.modifiers) {
+                (KeyCode::Esc, _) => {
+                    self.mode = Mode::Normal;
+                }
+                (KeyCode::Enter, _) => {
+                    let replaced = self.replace_next(&state.query, &state.replacement);
+                    state.matches =
+                        search::count_matches(&self.buffer.to_string(), &state.query);
+                    if !replaced {
+                        self.set_message("Not found");
+                    }
+                    self.mode = Mode::Replace(state);
+                }
+                (KeyCode::Char('a'), _) | (KeyCode::Char('A'), _) => {
+                    let count = self.replace_all(&state.query, &state.replacement);
+                    if count == 0 {
+                        state.matches = 0;
+                        self.set_message("Not found");
+                        self.mode = Mode::Replace(state);
+                    } else {
+                        self.mode = Mode::Normal;
+                    }
+                }
+                _ => {}
+            },
+        }
+    }
+
     fn handle_confirm_key(&mut self, key: KeyEvent) {
         let action = match &self.mode {
             Mode::Confirm { action, .. } => action.clone(),
@@ -775,6 +885,83 @@ impl App {
                 self.set_message("Not found");
             }
         }
+    }
+
+    fn replace_next(&mut self, query: &str, replacement: &str) -> bool {
+        if query.is_empty() {
+            return false;
+        }
+
+        let text = self.buffer.to_string();
+        let mut start = self.cursor.byte_idx(&self.buffer).min(text.len());
+        while start > 0 && !text.is_char_boundary(start) {
+            start -= 1;
+        }
+        let match_index = text[start..]
+            .find(query)
+            .map(|offset| start + offset)
+            .or_else(|| text.find(query));
+        let Some(index) = match_index else {
+            return false;
+        };
+
+        let cursor_before = self.cursor;
+        let end = index + query.len();
+        self.buffer.remove(index, end);
+        if !replacement.is_empty() {
+            self.buffer.insert(index, replacement);
+        }
+
+        let after = index + replacement.len();
+        self.cursor.line = self.buffer.byte_to_line(after);
+        self.cursor.col = after - self.buffer.line_to_byte(self.cursor.line);
+        self.cursor.clear_selection();
+        self.ensure_cursor_visible();
+        self.history.push(Edit {
+            byte_idx: index,
+            deleted: query.to_string(),
+            inserted: replacement.to_string(),
+            cursor_before,
+            cursor_after: self.cursor,
+        });
+        self.modified_since_build();
+        self.set_message("Replaced 1");
+        true
+    }
+
+    fn replace_all(&mut self, query: &str, replacement: &str) -> usize {
+        if query.is_empty() {
+            return 0;
+        }
+
+        let old = self.buffer.to_string();
+        let (new, count) = search::replace_all(&old, query, replacement);
+        if count == 0 {
+            return 0;
+        }
+
+        let cursor_before = self.cursor;
+        let mut position = self.cursor.byte_idx(&self.buffer).min(new.len());
+        while position > 0 && !new.is_char_boundary(position) {
+            position -= 1;
+        }
+
+        self.buffer.remove(0, old.len());
+        self.buffer.insert(0, &new);
+        self.cursor.line = self.buffer.byte_to_line(position);
+        self.cursor.col = position - self.buffer.line_to_byte(self.cursor.line);
+        self.cursor.clear_selection();
+        self.ensure_cursor_visible();
+        self.history.push(Edit {
+            byte_idx: 0,
+            deleted: old,
+            inserted: new,
+            cursor_before,
+            cursor_after: self.cursor,
+        });
+        self.modified_since_build();
+        self.set_message(&format!("Replaced {count}"));
+        count
     }
 
     fn save(&mut self) {
@@ -1421,7 +1608,9 @@ impl App {
     }
 
     fn editor_height(&self) -> usize {
-        let status_lines: u16 = if matches!(self.mode, Mode::Command { .. }) {
+        let status_lines: u16 = if matches!(self.mode, Mode::Command { .. })
+            || matches!(self.mode, Mode::Replace(_))
+        {
             2
         } else {
             1
@@ -1475,5 +1664,43 @@ impl App {
     fn cancel_message(&mut self) {
         self.message.clear();
         self.message_until = Instant::now();
+    }
+}
+
+#[cfg(test)]
+mod replace_tests {
+    use super::*;
+
+    fn app_with(text: &str) -> App {
+        let mut app = App::new();
+        app.buffer = Buffer::load_from_str(text);
+        app
+    }
+
+    #[test]
+    fn replace_all_is_one_undo_step() {
+        let mut app = app_with("foo bar foo");
+        app.cursor.line = 0;
+        app.cursor.col = 0;
+
+        assert_eq!(app.replace_all("foo", "qux"), 2);
+        assert_eq!(app.buffer.to_string(), "qux bar qux");
+
+        app.undo();
+        assert_eq!(app.buffer.to_string(), "foo bar foo");
+
+        app.redo();
+        assert_eq!(app.buffer.to_string(), "qux bar qux");
+    }
+
+    #[test]
+    fn replace_next_wraps_to_the_top() {
+        let mut app = app_with("foo foo");
+        app.cursor.line = 0;
+        app.cursor.col = app.buffer.len_bytes();
+
+        assert!(app.replace_next("foo", "bar"));
+        assert_eq!(app.buffer.to_string(), "bar foo");
+        assert_eq!(app.cursor.col, 3);
     }
 }

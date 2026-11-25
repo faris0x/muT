@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Faris Alfarhan
+// SPDX-License-Identifier: MIT
+
 use std::path::PathBuf;
 use mu_t::buffer::Buffer;
 use mu_t::cursor::Cursor;

@@ -53,6 +53,7 @@ muT doc.tex            # Open existing file
 | `Ctrl+C` / `Ctrl+X` / `Ctrl+V` | Copy / Cut / Paste |
 | `Ctrl+A` | Select all |
 | `Ctrl+F` | Find |
+| `Ctrl+R` | Replace (Enter next, `a` all) |
 | `Ctrl+G` | Go to line |
 | `Ctrl+B` | Build (async `pdflatex`) |
 | `Ctrl+P` | Toggle Zathura preview |
