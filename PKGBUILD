@@ -2,9 +2,9 @@
 # Contributor: faris0x <farisalfarhan@icloud.com>
 
 pkgname=muT
-pkgver=1.0.0
+pkgver=1.1.0
 pkgrel=1
-pkgdesc="A terminal-based LaTeX editor (μT) — Micro-like editing, pdflatex build, Zathura preview"
+pkgdesc="Terminal-based LaTeX editor with pdflatex build and Zathura preview"
 arch=('x86_64')
 url="https://github.com/faris0x/muT"
 license=('MIT')
